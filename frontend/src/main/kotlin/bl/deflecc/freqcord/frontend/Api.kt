@@ -25,11 +25,12 @@ object Api {
             parameter("stopTime", stopTime)
         }.body()
 
-    suspend fun getLineChartData(guild: Guild, startTime: LocalDateTime, stopTime: LocalDateTime): LineChartData =
+    suspend fun getLineChartData(guild: Guild, startTime: LocalDateTime, stopTime: LocalDateTime, binWidth: String): LineChartData =
         client.get("$API_URL/stats/line_chart_data") {
             parameter("guildId", guild.id)
             parameter("startTime", startTime)
             parameter("stopTime", stopTime)
+            parameter("binWidth", binWidth)
         }.body()
 
     suspend fun getTimestamps(guild: Guild): GetTimeStampsResponse = client.get("$API_URL/stats/get_time_stamps") {

@@ -129,7 +129,7 @@ fun Route.messageRouting() {
         }
 
         get("line_chart_data") {
-            val binWidth = Duration.parse("10m")
+            val binWidth = call.request.queryParameters.getOrFail("binWidth").let { Duration.parse(it) }
             val guildId = call.request.queryParameters.getOrFail("guildId").let { Integer.parseInt(it) }
             val startTime = call.request.queryParameters.getOrFail("startTime").let { LocalDateTime.parse(it) }
             val stopTime = call.request.queryParameters.getOrFail("stopTime").let { LocalDateTime.parse(it) }

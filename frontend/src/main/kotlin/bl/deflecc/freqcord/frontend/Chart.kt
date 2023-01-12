@@ -26,7 +26,7 @@ class ChartDiv(
     var config = config
         set(value) {
             field = value
-            if (value != null) jsChart?.setOption(value)
+            if (value != null) jsChart?.setOption(value, true)
         }
 
     init {

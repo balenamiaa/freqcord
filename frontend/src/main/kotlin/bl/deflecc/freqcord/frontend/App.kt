@@ -19,6 +19,7 @@ import io.kvision.utils.px
 import io.kvision.utils.rem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDateTime
 import kotlin.coroutines.CoroutineContext
@@ -30,6 +31,9 @@ class App : Application(), CoroutineScope {
     private val endTime = ObservableValue<LocalDateTime?>(null)
     private val lineChartDataForCurrentGuild = ObservableValue<LineChartData?>(null)
     private val pieChartDataForCurrentGuild = ObservableValue<PieChartData?>(null)
+    private var binWidthInput = ObservableValue<Input?>(null)
+    private var pieChart: Chart? = null
+    private var lineChart: Chart? = null
 
     private fun onGuildsList(guilds: List<Guild>) {
         currentGuild.setState(guilds.firstOrNull())
@@ -42,51 +46,39 @@ class App : Application(), CoroutineScope {
                 startTime.setState(timestamps.start)
                 endTime.setState(timestamps.end)
 
-                lineChartDataForCurrentGuild.setState(Api.getLineChartData(guild, timestamps.start, timestamps.end))
-                pieChartDataForCurrentGuild.setState(Api.getPieChartData(guild, timestamps.start, timestamps.end))
+                updateChartsData()
+                updateCharts()
             }
         }
     }
 
-    private fun onTimestampStart(newState: LocalDateTime?) {
-        newState?.let { start ->
-            val guild = currentGuild.getState()
-            val end = endTime.getState()
-            if (guild != null && end != null) {
-                launch {
-                    lineChartDataForCurrentGuild.setState(
-                        Api.getLineChartData(
-                            guild, start, end
-                        )
-                    )
-                    pieChartDataForCurrentGuild.setState(
-                        Api.getPieChartData(
-                            guild, start, end
-                        )
-                    )
-                }
-            }
+    private suspend fun updateChartsData() {
+        val guild = currentGuild.getState()
+        val start = startTime.getState()
+        val end = endTime.getState()
+        if (guild != null && start != null && end != null) {
+
+            lineChartDataForCurrentGuild.setState(
+                Api.getLineChartData(
+                    guild, start, end, "${binWidthInput.getState()?.value ?: "5"}m"
+                )
+            )
+
+            pieChartDataForCurrentGuild.setState(
+                Api.getPieChartData(
+                    guild, start, end
+                )
+            )
         }
     }
 
-    private fun onTimestampEnd(newState: LocalDateTime?) {
-        newState?.let { end ->
-            val guild = currentGuild.getState()
-            val start = startTime.getState()
-            if (guild != null && start != null) {
-                launch {
-                    lineChartDataForCurrentGuild.setState(
-                        Api.getLineChartData(
-                            guild, start, end
-                        )
-                    )
-                    pieChartDataForCurrentGuild.setState(
-                        Api.getPieChartData(
-                            guild, start, end
-                        )
-                    )
-                }
-            }
+    private fun updateCharts() {
+        pieChartDataForCurrentGuild.getState()?.let {
+            pieChart?.configuration = createPieChart(it)
+        }
+
+        lineChartDataForCurrentGuild.getState()?.let {
+            lineChart?.configuration = createLineChart(it)
         }
     }
 
@@ -96,8 +88,6 @@ class App : Application(), CoroutineScope {
 
         guildsList.subscribe(::onGuildsList)
         currentGuild.subscribe(::onCurrentGuild)
-        startTime.subscribe(::onTimestampStart)
-        endTime.subscribe(::onTimestampEnd)
 
         launch {
             guildsList.clear()
@@ -134,7 +124,7 @@ class App : Application(), CoroutineScope {
 
                         responsiveGridPanel {
                             options(1, 1) {
-                                flexPanel(FlexDirection.COLUMN, spacing = 1, alignItems = AlignItems.CENTER) {
+                                div(className = "labelledInput") {
                                     label("Start Date-Time") {}
                                     input(InputType.DATETIME_LOCAL) {
                                         textAlign = TextAlign.CENTER
@@ -150,8 +140,8 @@ class App : Application(), CoroutineScope {
                             }
 
                             options(2, 1) {
-                                flexPanel(FlexDirection.COLUMN, spacing = 1, alignItems = AlignItems.CENTER) {
-                                    label("Stop Date-Time") {}
+                                div(className = "labelledInput") {
+                                    label("stop datetime") {}
                                     input(InputType.DATETIME_LOCAL) {
                                         textAlign = TextAlign.CENTER
                                         width = 100.perc
@@ -166,16 +156,22 @@ class App : Application(), CoroutineScope {
                             }
 
                             options(3, 1) {
-                                flexPanel(FlexDirection.COLUMN, spacing = 1, alignItems = AlignItems.CENTER) {
-                                    label("Stop Date-Time") {}
-                                    input(InputType.DATETIME_LOCAL) {
+                                div(className = "labelledInput") {
+                                    label("bin-width") { }
+                                    binWidthInput.value = input(InputType.NUMBER) {
                                         textAlign = TextAlign.CENTER
-                                        width = 100.perc
-                                    }.bind(endTime) { endTime ->
-                                        endTime?.let { value = it.trimmedStringForJs() }
-                                    }.onEvent {
-                                        change = {
-                                            endTime.setState(LocalDateTime.parse(it.target.asDynamic().value as String))
+                                    }
+                                }
+                            }
+                            options(4, 1) {
+                                button("Generate Plot") {
+                                    align = Align.CENTER
+                                    justifySelf = JustifyItems.CENTER
+                                }.onEvent {
+                                    click = {
+                                        launch {
+                                            updateChartsData()
+                                            updateCharts()
                                         }
                                     }
                                 }
@@ -192,7 +188,7 @@ class App : Application(), CoroutineScope {
                             id = "pieChart"
                             setStyle("flex", "0.5 1 0")
 
-                            chart().bind(pieChartDataForCurrentGuild) { data ->
+                            pieChart = chart().bind(pieChartDataForCurrentGuild) { data ->
                                 data?.let { configuration = createPieChart(it) }
                             }
                         }
@@ -200,7 +196,7 @@ class App : Application(), CoroutineScope {
                         div {
                             id = "lineChart"
                             setStyle("flex", "0.5 1 0")
-                            chart().bind(lineChartDataForCurrentGuild) { data ->
+                            lineChart = chart().bind(lineChartDataForCurrentGuild) { data ->
                                 data?.let { configuration = createLineChart(it) }
                             }
                         }

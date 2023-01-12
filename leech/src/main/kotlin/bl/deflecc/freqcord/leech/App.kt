@@ -74,7 +74,6 @@ suspend fun main() {
         if (message.content.contains("<so what became of reality. nothing came out of it.>")) {
             guild.channels.collect {
                 it.asChannelOfOrNull<MessageChannel>()?.getMessagesBefore(message.id)?.collect { oldMessage ->
-                    println(oldMessage.content)
                     registerMessageToDb(client, guild, oldMessage)
                 }
             }
